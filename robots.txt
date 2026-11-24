@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://manishabains444-collab.github.io/styvoa/sitemap.xml
