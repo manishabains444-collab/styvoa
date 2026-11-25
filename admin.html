@@ -5,10 +5,13 @@ aside{position:sticky;top:0;height:100vh;overflow:auto}nav button{display:block;
 <div class="shell" id="dashboard" hidden><aside><div class="brand"><b>◆</b> Styvoa Admin</div><p class="muted" style="color:#b8cbbd;margin-top:8px">Owner workspace · India</p><nav id="nav"></nav></aside><main><div class="top"><h2 id="pageTitle">Overview</h2><div class="actions"><a class="store-link" href="./homepage-preview.html">Open Storefront ↗</a><button id="refresh" class="secondary">Refresh data</button><button id="logout">Sign out</button></div></div><div id="dbStatus" class="status" role="status">Connecting…</div><div id="content"></div><p class="foot">Styvoa · Firebase · Owner workspace · Private storefront shares this catalog; checkout and legacy data migration are pending</p></main></div><dialog id="editor"><h2 id="editorTitle"></h2><p id="editorNote" class="muted"></p><form id="editForm"><div class="formgrid" id="fields"></div><p id="editorError" class="error" role="alert"></p><div class="dialogfoot"><button type="button" id="closeEditor" class="secondary">Cancel</button><button id="saveEditor" type="submit">Save</button></div></form></dialog>
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js';
+import {initializeAppCheck,ReCaptchaEnterpriseProvider} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-app-check.js';
 import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut,setPersistence,browserSessionPersistence,GoogleAuthProvider,signInWithPopup} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js';
 import {getFirestore,collection,doc,getDocFromServer,getDocsFromServer,setDoc,updateDoc,addDoc,serverTimestamp,runTransaction,writeBatch} from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 const config={apiKey:'AIzaSyAJVlQ0lyM-xmGv6mornW3Jk01vvmEpTFw',authDomain:'styvoa.firebaseapp.com',projectId:'styvoa',storageBucket:'styvoa.firebasestorage.app',messagingSenderId:'82440878639',appId:'1:82440878639:web:9bf3baf7836df2df6f64da'};
-const $=id=>document.getElementById(id),app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
+const $=id=>document.getElementById(id),app=initializeApp(config);
+const appCheck=initializeAppCheck(app,{provider:new ReCaptchaEnterpriseProvider('6LflLjIuAAAAABR9wklU8Itc5WV4q0eXgB0aM41T'),isTokenAutoRefreshEnabled:true});
+const auth=getAuth(app),db=getFirestore(app);
 const E=(tag,text='',cls='')=>{let e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e};
 const btn=(text,fn,cls='secondary')=>{let b=E('button',text,cls);b.type='button';b.onclick=fn;return b};
 const money=v=>Number.isFinite(v)?new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(v):'—';
