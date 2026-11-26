@@ -1,0 +1,84 @@
+// Insert inside match /databases/{database}/documents, alongside existing collection rules.
+// Requires existing signedIn(), isOwner(), validText(v, limit) functions.
+function ownsCheckout(id) {
+  return signedIn()
+    && exists(/databases/$(database)/documents/checkout_requests/$(id))
+    && get(/databases/$(database)/documents/checkout_requests/$(id)).data.uid == request.auth.uid;
+}
+function validReturn(id, d) {
+  let o = get(/databases/$(database)/documents/checkout_requests/$(id)).data;
+  let status = o.get('orderStatus', 'Pending');
+  return ownsCheckout(id)
+    && id.matches('^[a-f0-9]{32}$')
+    && o.live == true
+    && d.keys().hasAll(['uid','orderId','kind','reason','details','status','createdAt'])
+    && d.keys().hasOnly(['uid','orderId','kind','reason','details','status','createdAt'])
+    && d.uid == request.auth.uid && d.orderId == id
+    && ((d.kind == 'Cancellation' && status in ['Pending','Accepted','Unshipped'])
+      || (d.kind == 'Return' && status == 'Delivered'))
+    && validText(d.reason, 100) && validText(d.details, 1000)
+    && d.status == 'Requested' && d.createdAt == request.time;
+}
+match /return_requests/{id} {
+  allow get: if isOwner() || ownsCheckout(id);
+  allow list: if isOwner();
+  allow create: if validReturn(id, request.resource.data);
+  allow update, delete: if isOwner();
+}
+match /public_support/{id} {
+  allow get: if id == 'contact' || isOwner();
+  allow list: if isOwner();
+  allow create, update: if isOwner() && id == 'contact'
+    && request.resource.data.keys().hasAll(['whatsapp','email','hours'])
+    && request.resource.data.keys().hasOnly(['whatsapp','email','hours'])
+    && request.resource.data.whatsapp is string
+    && (request.resource.data.whatsapp == '' || request.resource.data.whatsapp.matches('^[1-9][0-9]{7,14}$'))
+    && request.resource.data.email is string && request.resource.data.email.size() <= 150
+    && request.resource.data.hours is string && request.resource.data.hours.size() <= 150;
+  allow delete: if isOwner();
+}
+match /support_tickets/{id} {
+  allow read: if isOwner() || (signedIn() && resource.data.uid == request.auth.uid);
+  allow create: if signedIn() && id.matches('^[a-f0-9]{32}$')
+    && request.resource.data.keys().hasAll(['uid','name','phone','topic','orderId','message','status','createdAt'])
+    && request.resource.data.keys().hasOnly(['uid','name','phone','topic','orderId','message','status','createdAt'])
+    && request.resource.data.uid == request.auth.uid
+    && validText(request.resource.data.name, 100)
+    && request.resource.data.phone is string && request.resource.data.phone.matches('^[6-9][0-9]{9}$')
+    && request.resource.data.topic in ['Order','Payment','Delivery','Return or refund','Design service','Product inquiry','Other']
+    && request.resource.data.orderId is string && request.resource.data.orderId.size() <= 100
+    && validText(request.resource.data.message, 1500)
+    && request.resource.data.status == 'Open' && request.resource.data.createdAt == request.time;
+  allow update, delete: if isOwner();
+}
+function metricCounter(v) {
+  return v is int && v >= 0 && v <= 1000;
+}
+function metricStep(a,b) {
+  return a >= b && a-b <= 40;
+}
+function validMetrics(id,d) {
+  return signedIn()
+    && d.keys().hasAll(['uid','day','pageViews','impressions','productClicks','checkoutViews'])
+    && d.keys().hasOnly(['uid','day','pageViews','impressions','productClicks','checkoutViews'])
+    && d.uid == request.auth.uid
+    && d.day is int
+    && id == request.auth.uid + '-' + string(d.day)
+    && d.day * 86400000 <= request.time.toMillis() + 19800000
+    && (d.day+1) * 86400000 > request.time.toMillis() + 19800000
+    && metricCounter(d.pageViews) && metricCounter(d.impressions)
+    && metricCounter(d.productClicks) && metricCounter(d.checkoutViews);
+}
+match /visitor_metrics/{id} {
+  allow read, delete: if isOwner();
+  allow create: if validMetrics(id,request.resource.data)
+    && request.resource.data.pageViews <= 40 && request.resource.data.impressions <= 40
+    && request.resource.data.productClicks <= 40 && request.resource.data.checkoutViews <= 40;
+  allow update: if validMetrics(id,request.resource.data)
+    && request.resource.data.uid == resource.data.uid
+    && request.resource.data.day == resource.data.day
+    && metricStep(request.resource.data.pageViews,resource.data.pageViews)
+    && metricStep(request.resource.data.impressions,resource.data.impressions)
+    && metricStep(request.resource.data.productClicks,resource.data.productClicks)
+    && metricStep(request.resource.data.checkoutViews,resource.data.checkoutViews);
+}
