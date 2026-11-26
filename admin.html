@@ -55,10 +55,11 @@ function customerOrderUpdate(tx,id,status,payment,extra={}){
  const v={orderStatus:status,paymentStatus:payment==='Verified'?'Verified':'Pending',deliveryStatus:status==='Delivered'?'Delivered':'Not delivered',statusUpdatedAt:serverTimestamp()};
  if(typeof extra.courier==='string')v.courier=extra.courier.slice(0,150);
  if(typeof extra.trackingId==='string')v.trackingId=extra.trackingId.slice(0,150);
+ if(typeof extra.trackingUrl==='string'){try{const u=new URL(extra.trackingUrl);v.trackingUrl=u.protocol==='https:'&&!u.username&&!u.password?u.href.slice(0,1000):''}catch{v.trackingUrl=''}}
  if(typeof extra.itemsText==='string')v.itemsText=extra.itemsText.slice(0,2000);
  tx.update(doc(db,'checkout_requests',id),v);
 }
-function publishOrderHistory(){return mutate(async()=>{const orders=await records('orders');let count=0;for(const order of orders){if(!order.checkoutRequestId)continue;await runTransaction(db,async tx=>{const o=await tx.get(doc(db,'orders',order.id)),q=await tx.get(doc(db,'checkout_requests',order.checkoutRequestId));if(!o.exists()||!q.exists()||q.data().live!==true)return;const v=o.data();if(v.checkoutRequestId!==q.id)return;customerOrderUpdate(tx,q.id,v.declinedAt&&v.status==='Cancelled'?'Declined':v.status,v.paymentStatus,{courier:v.courier||'',trackingId:v.trackingId||'',itemsText:v.itemsText||''});count++})}status(count+' existing orders published to their owners.')},'Publish previous website order statuses to the customers who placed those orders?')}
+function publishOrderHistory(){return mutate(async()=>{const orders=await records('orders');let count=0;for(const order of orders){if(!order.checkoutRequestId)continue;await runTransaction(db,async tx=>{const o=await tx.get(doc(db,'orders',order.id)),q=await tx.get(doc(db,'checkout_requests',order.checkoutRequestId));if(!o.exists()||!q.exists()||q.data().live!==true)return;const v=o.data();if(v.checkoutRequestId!==q.id)return;customerOrderUpdate(tx,q.id,v.declinedAt&&v.status==='Cancelled'?'Declined':v.status,v.paymentStatus,{courier:v.courier||'',trackingId:v.trackingId||'',trackingUrl:v.trackingUrl||'',itemsText:v.itemsText||''});count++})}status(count+' existing orders published to their owners.')},'Publish previous website order statuses to the customers who placed those orders?')}
 // Stock and payment-reference protection. All stock changes and payment acceptance are atomic.
 function normalizeUtr(value){return String(value||'').normalize('NFKC').trim().toUpperCase().replace(/[\s-]+/g,'')}
 async function prepareUtr(value,orderId){
